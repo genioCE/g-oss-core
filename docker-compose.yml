@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    env_file: .env
+    ports: ["9000:9000","9001:9001"]
+    volumes: ["minio-data:/data"]
+  createbuckets:
+    image: minio/mc:latest
+    depends_on: [ minio ]
+    env_file: .env
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD &&
+      mc mb -p local/$S3_BUCKET_BRONZE || true
+      "
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    ports: ["19120:19120"]
+  trino:
+    image: trinodb/trino:latest
+    volumes: ["./trino/catalog:/etc/trino/catalog"]
+    ports: ["8081:8080"]
+    depends_on: [ nessie, minio ]
+volumes: { minio-data: {} }
